@@ -1,0 +1,666 @@
+From 8a5c424666bfe9c38a800009c5fece1b2db6d223 Mon Sep 17 00:00:00 2001
+From: Carlo Caione <carlo.caione@gmail.com>
+Date: Fri, 24 Jan 2014 17:18:10 +0100
+Subject: [PATCH 2/2] Add hachiko support
+
+Signed-off-by: Carlo Caione <carlo.caione@gmail.com>
+---
+ arch/arm/include/asm/arch-rza1/rza1-regs.h |   6 +
+ board/renesas/hachiko/Makefile             |  38 ++++
+ board/renesas/hachiko/hachiko.c            |  76 ++++++++
+ board/renesas/hachiko/lowlevel_init.S      | 172 +++++++++++++++++
+ boards.cfg                                 |   2 +
+ include/configs/hachiko.h                  | 300 +++++++++++++++++++++++++++++
+ 6 files changed, 594 insertions(+)
+ create mode 100644 board/renesas/hachiko/Makefile
+ create mode 100644 board/renesas/hachiko/hachiko.c
+ create mode 100644 board/renesas/hachiko/lowlevel_init.S
+ create mode 100644 include/configs/hachiko.h
+
+diff --git a/arch/arm/include/asm/arch-rza1/rza1-regs.h b/arch/arm/include/asm/arch-rza1/rza1-regs.h
+index 5d736db..6d6d033 100644
+--- a/arch/arm/include/asm/arch-rza1/rza1-regs.h
++++ b/arch/arm/include/asm/arch-rza1/rza1-regs.h
+@@ -12,10 +12,16 @@
+ #define RZA1_FRQCR_BASE          (0xFCFE0010)
+ #define RZA1_STBCR_BASE          (0xFCFE0020)
+ #define RZA1_PCTR_BASE           (0xFCFE3000)
++#define RZA1_SYSCR_BASE          (0xFCFE0400)
+ #define RZA1_OST_BASE            (0xFCFEC000)
+ #define RZA1_BCR_BASE            (0x3FFFC000)
+ #define RZA1_SDRAM_BASE          (0x3FFFC000)
+ 
++/* System Control Registers */
++#define SYSCR1 (RZA1_SYSCR_BASE + 0x00)
++#define SYSCR2 (RZA1_SYSCR_BASE + 0x04)
++#define SYSCR3 (RZA1_SYSCR_BASE + 0x08)
++
+ /* Clock Registers */
+ #define FRQCR (RZA1_FRQCR_BASE + 0x00)
+ #define FRQCR2 (RZA1_FRQCR_BASE + 0x04)
+diff --git a/board/renesas/hachiko/Makefile b/board/renesas/hachiko/Makefile
+new file mode 100644
+index 0000000..d6ec5f7
+--- /dev/null
++++ b/board/renesas/hachiko/Makefile
+@@ -0,0 +1,38 @@
++#
++# Copyright (C) 2013 Renesas Solutions Corp.
++#
++# This program is free software; you can redistribute it and/or
++# modify it under the terms of the GNU General Public License as
++# published by the Free Software Foundation; either version 2 of
++# the License, or (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston,
++# MA 02111-1307 USA
++
++include $(TOPDIR)/config.mk
++
++LIB	= lib$(BOARD).o
++
++OBJS	:= hachiko.o
++SOBJS	:= lowlevel_init.o
++
++LIB	:= $(addprefix $(obj),$(LIB))
++OBJS	:= $(addprefix $(obj),$(OBJS))
++SOBJS	:= $(addprefix $(obj),$(SOBJS))
++
++$(LIB):	$(obj).depend $(OBJS) $(SOBJS)
++	$(call cmd_link_o_target, $(OBJS) $(SOBJS))
++
++#########################################################################
++
++# defines $(obj).depend target
++include $(SRCTREE)/rules.mk
++
++sinclude $(obj).depend
+diff --git a/board/renesas/hachiko/hachiko.c b/board/renesas/hachiko/hachiko.c
+new file mode 100644
+index 0000000..c504789
+--- /dev/null
++++ b/board/renesas/hachiko/hachiko.c
+@@ -0,0 +1,76 @@
++/*
++ * Copyright (C) 2008-2013 Renesas Solutions Corp.
++ * Copyright (C) 2012 Renesas Electronics Europe Ltd.
++ * Copyright (C) 2012 Phil Edworthy
++ * Copyright (C) 2008 Nobuhiro Iwamatsu
++ *
++ * Based on u-boot/board/rsk7264/rsk7264.c
++ *
++ * This file is released under the terms of GPL v2 and any later version.
++ * See the file COPYING in the root directory of the source tree for details.
++ */
++
++#include <common.h>
++#include <asm/io.h>
++#include <asm/processor.h>
++#include <i2c.h>
++
++DECLARE_GLOBAL_DATA_PTR;
++
++int checkboard(void)
++{
++	puts("BOARD: Renesas R7S72100\n");
++	return 0;
++}
++
++int board_init(void)
++{
++	gd->bd->bi_boot_params = (CONFIG_SYS_SDRAM_BASE + 0x100);
++	return 0;
++}
++
++int board_early_init_f(void)
++{
++	rtc_reset();	/* to start rtc */
++	return 0;
++}
++
++int board_late_init(void)
++{
++	u8 mac[6];
++
++	/* Read Mac Address and set*/
++	i2c_init(CONFIG_SYS_I2C_SPEED, 0);
++	i2c_set_bus_num(CONFIG_SYS_I2C_MODULE);
++
++	/* Read MAC address */
++	i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR,
++		 CONFIG_SH_ETHER_EEPROM_ADDR,
++		 CONFIG_SYS_I2C_EEPROM_ADDR_LEN,
++		 mac, 6);
++
++	if (is_valid_ether_addr(mac))
++		eth_setenv_enetaddr("ethaddr", mac);
++
++	return 0;
++}
++
++int dram_init(void)
++{
++#if (1 !=  CONFIG_NR_DRAM_BANKS)
++# error CONFIG_NR_DRAM_BANKS must set 1 in this board.
++#endif
++	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
++	gd->bd->bi_dram[0].size = CONFIG_SYS_SDRAM_SIZE;
++	gd->ram_size = CONFIG_SYS_SDRAM_SIZE * CONFIG_NR_DRAM_BANKS;
++
++	return 0;
++}
++
++void reset_cpu(ulong addr)
++{
++}
++
++void led_set_state(unsigned short value)
++{
++}
+diff --git a/board/renesas/hachiko/lowlevel_init.S b/board/renesas/hachiko/lowlevel_init.S
+new file mode 100644
+index 0000000..3ccabfe
+--- /dev/null
++++ b/board/renesas/hachiko/lowlevel_init.S
+@@ -0,0 +1,172 @@
++/*
++ * Copyright (C) 2008-2013 Renesas Solutions Corp.
++ * Copyright (C) 2012 Renesas Electronics Europe Ltd.
++ * Copyright (C) 2012 Phil Edworthy
++ * Copyright (C) 2008 Nobuhiro Iwamatsu
++ *
++ * Based on board/renesas/rsk7264/lowlevel_init.S
++ *
++ * This file is released under the terms of GPL v2 and any later version.
++ * See the file COPYING in the root directory of the source tree for details.
++ */
++#include <config.h>
++#include <version.h>
++#include <asm/arch/rza1-regs.h>
++#include <asm/macro.h>
++
++	.global	lowlevel_init
++
++	.text
++	.align	2
++
++lowlevel_init:
++	/* PL310 init */
++	write32 0x3fffff80, 0x00000001
++
++	/* Disable WDT */
++	write16	WTCSR, WTCSR_D
++	write16	WTCNT, WTCNT_D
++
++	/* Disable Register Bank interrupts */
++	/* write16 IBNR, IBNR_D */
++
++	/* Set clocks */
++	write16	FRQCR, FRQCR_D
++
++	/* Enable all peripherals(Standby Control) */
++	write8 STBCR3, STBCR3_D
++	write8 STBCR4, STBCR4_D
++	write8 STBCR5, STBCR5_D
++	write8 STBCR6, STBCR6_D
++	write8 STBCR7, STBCR7_D
++	write8 STBCR8, STBCR8_D
++	write8 STBCR9, STBCR9_D
++	write8 STBCR10, STBCR10_D
++	write8 STBCR11, STBCR11_D
++	write8 STBCR12, STBCR12_D
++
++	/* Port Control Register */
++	/* Port1 Control register Reset */
++	write16 PIBC1, PIBC1_D
++	write16 PBDC1, PBDC1_D
++	write16 PM1, PM1_D
++	write16 PMC1, PMC1_D
++	write16 PIPC1, PIPC1_D
++
++	/* Port1 Control register Set */
++	write16 PBDC1, PBDC1_S
++	write16 PFC1, PFC1_D
++	write16 PFCE1, PFCE1_D
++	write16 PFCAE1, PFCAE1_D
++	write16 PIPC1, PIPC1_S
++	write16 PMC1, PMC1_S
++
++	/* Port2 Control register Reset */
++	write16 PIBC2, PIBC2_D
++	write16 PBDC2, PBDC2_D
++	write16 PM2, PM2_D
++	write16 PMC2, PMC2_D
++	write16 PIPC2, PIPC2_D
++
++	/* Port2 Control register Set */
++	write16 PBDC2, PBDC2_S
++	write16 PFC2, PFC2_D
++	write16 PFCE2, PFCE2_D
++	write16 PFCAE2, PFCAE2_D
++	write16 PIPC2, PIPC2_S
++	write16 PMC2, PMC2_S
++
++	/* Port3 Control register Reset */
++	write16 PIBC3, PIBC3_D
++	write16 PBDC3, PBDC3_D
++	write16 PM3, PM3_D
++	write16 PMC3, PMC3_D
++	write16 PIPC3, PIPC3_D
++
++	/* Port3 Control register Set */
++	write16 PBDC3, PBDC3_S
++	write16 PFC3, PFC3_D
++	write16 PFCE3, PFCE3_D
++	write16 PFCAE3, PFCAE3_D
++	write16 PIPC3, PIPC3_S
++	write16 PMC3, PMC3_S
++	
++	/* Port5 Control register Set */
++	write16 PMC5, PMC5_D
++	write16 PFC5, PFC5_D
++	write16 PFCE5, PFCE5_D
++	write16 PFCAE5, PFCAE5_D
++	write16 PM5, PM5_D
++
++	/* Port6 Control register Set */
++	write16 PMC6, PMC6_D
++	write16 PIPC6, PIPC6_D
++
++	/* Port7 Control register Set */
++	write16 PMC7, PMC7_D
++	write16 PFC7, PFC7_D
++	write16 PFCE7, PFCE7_D
++	write16 PFCAE7, PFCAE7_D
++	write16 PIPC7, PIPC7_D
++	write16 PM7, PM7_D
++
++	/* Port8 Control register Set */
++	write16 PMC8, PMC8_D
++	write16 PFC8, PFC8_D
++	write16 PFCE8, PFCE8_D
++	write16 PFCAE8, PFCAE8_D
++	write16 PIPC8, PIPC8_D
++	write16 PM8, PM8_D
++
++	/* Port9 Control register Set */
++	write16 PMC9, PMC9_D
++	write16 PFC9, PFC9_D
++	write16 PFCE9, PFCE9_D
++	write16 PFCAE9, PFCAE9_D
++	write16 PIPC9, PIPC9_D
++	write16 PM9, PM9_D
++
++	/* Configure bus (CS0, CS1) */
++	write32 CS0WCR, CS0WCR_D
++	write32 CS0BCR, CS0BCR_D
++	write32 CS1WCR, CS1WCR_D
++	write32 CS1BCR, CS1BCR_D
++
++	/* Configure SDRAM (CS2, CS3) */
++	write32	CS2BCR, CS2BCR_D
++	write32	CS2WCR, CS2WCR_D
++	write32	CS3BCR, CS3BCR_D
++	write32	CS3WCR, CS3WCR_D
++	write32	SDCR, SDCR_D
++	write32	RTCOR, RTCOR_D
++	write32	RTCSR, RTCSR_D
++
++	/* Disable on-chip data-retention RAM protection */
++	write8 SYSCR3, SYSCR3_D
++
++	/* wait */
++	ldr	r3, REPEAT_D
++	mov	r2, #0
++repeat0:
++	add	r2, r2, #1
++	cmp	r2, r3
++	ble	repeat0
++	nop
++
++	ldr	r1, SDRAM_MODE_CS2
++	mov	r0, #0
++	str	r0, [r1]
++	ldr	r1, SDRAM_MODE_CS3
++	mov	r0, #0
++	str	r0, [r1]
++
++	nop
++	/* back to arch calling code */
++	mov	pc, lr
++
++	.align 4
++
++.align 2
++SDRAM_MODE_CS2:	.long 0x3FFFD040
++SDRAM_MODE_CS3:	.long 0x3FFFE040
++REPEAT_D:	.long 0x000033F1
+diff --git a/boards.cfg b/boards.cfg
+index 19351cd..da5001e 100644
+--- a/boards.cfg
++++ b/boards.cfg
+@@ -322,6 +322,8 @@ zynq                         arm         armv7       zynq                xilinx
+ zynq_dcc                     arm         armv7       zynq                xilinx         zynq        zynq:ZYNQ_DCC
+ rskrza1                      arm         armv7       rskrza1             renesas        rza1
+ rskrza1_bootmode0            arm         armv7       rskrza1             renesas        rza1        rskrza1:BOOT_MODE0
++hachiko                      arm         armv7       hachiko             renesas        rza1
++hachiko_64                   arm         armv7       hachiko             renesas        rza1        hachiko:RAM_64MB
+ socfpga_cyclone5                arm         armv7          socfpga_cyclone5    altera		    socfpga
+ actux1_4_16                  arm         ixp         actux1              -              -           actux1:FLASH2X2
+ actux1_4_32                  arm         ixp         actux1              -              -           actux1:FLASH2X2,RAM_32MB
+diff --git a/include/configs/hachiko.h b/include/configs/hachiko.h
+new file mode 100644
+index 0000000..e3f7441
+--- /dev/null
++++ b/include/configs/hachiko.h
+@@ -0,0 +1,300 @@
++/*
++ * Configuation settings for the Renesas RSKRZA1 board
++ *
++ * Copyright (C) 2013 Renesas Solutions Corp.
++ * Copyright (C) 2012 Renesas Electronics Europe Ltd.
++ * Copyright (C) 2012 Phil Edworthy
++ *
++ * This file is released under the terms of GPL v2 and any later version.
++ * See the file COPYING in the root directory of the source tree for details.
++ */
++
++#ifndef __RSKRZA1_H
++#define __RSKRZA1_H
++
++#undef DEBUG
++#define CONFIG_ARMV7		1	/* This is an ARM V7 CPU core */
++#define CONFIG_CPU_RZA1	1
++#define CONFIG_BOARD_LATE_INIT	1
++#define CONFIG_MACH_TYPE MACH_TYPE_RSKRZA1
++#define CONFIG_BOARD_EARLY_INIT_F
++
++#define CONFIG_CMD_NET
++#define CONFIG_CMD_MII
++#define CONFIG_CMD_PING
++#define CONFIG_CMD_DHCP
++#define CONFIG_CMD_USB
++#define CONFIG_CMD_EXT2
++#define CONFIG_CMD_EXT4
++#define CONFIG_CMD_FAT
++#define CONFIG_CMD_SF
++#define CONFIG_CMD_I2C
++#define CONFIG_CMD_EEPROM
++#define CONFIG_CMD_DATE
++#define CONFIG_DOS_PARTITION
++#define CONFIG_MAC_PARTITION
++#define CONFIG_USB_STORAGE
++#define CONFIG_CMD_SNTP
++#define CONFIG_BOOTP_NTPSERVER
++#define CONFIG_BOOTP_TIMEOFFSET
++
++
++#define CONFIG_OF_LIBFDT
++#define CONFIG_CMDLINE_EDITING
++#define CONFIG_CMDLINE_TAG
++#define CONFIG_SETUP_MEMORY_TAGS
++#define CONFIG_INITRD_TAG
++
++#ifndef _CONFIG_CMD_DEFAULT_H
++# include <config_cmd_default.h>
++#endif
++
++#if !defined(CONFIG_RAM_64M)
++#define CONFIG_EXTRA_ENV_SETTINGS \
++	"bootcmd=usb start ; run usbload ; bootm 20007fc0 - 20500000\0" \
++	"usbload=ext2load usb 0 20007fc0 /boot/uImage ; ext2load usb 0 20500000 /boot/rza1-hachiko.dtb\0"
++#else
++#define CONFIG_EXTRA_ENV_SETTINGS \
++	"bootcmd=usb start ; run usbload ; bootm 0f000000 - 0e500000\0" \
++	"usbload=ext2load usb 0 0f000000 /boot/uImage ; ext2load usb 0 0e500000 /boot/rza1-hachiko.dtb\0"
++#endif
++
++#define CONFIG_BAUDRATE		115200
++
++#if !defined(CONFIG_RAM_64M)
++#define CONFIG_BOOTARGS		"console=ttySC3,115200 root=/dev/sda1 init=/init rw rootdelay=3 ignore_loglevel earlyprintk=sh-sci.3,115200"
++#else
++#define CONFIG_BOOTARGS		"console=ttySC3,115200 root=/dev/sda1 rw rootdelay=3 ignore_loglevel earlyprintk=sh-sci.3,115200"
++#endif
++
++#define CONFIG_BOOTDELAY	3
++#define CONFIG_SYS_BAUDRATE_TABLE	{ CONFIG_BAUDRATE }
++
++#define CONFIG_SYS_LONGHELP		/* undef to save memory	*/
++#define CONFIG_SYS_PROMPT	"=> "	/* Monitor Command Prompt */
++#define CONFIG_SYS_CBSIZE	256	/* Boot Argument Buffer Size */
++#define CONFIG_SYS_PBSIZE	256	/* Print Buffer Size */
++#define CONFIG_SYS_MAXARGS	16	/* max number of command args */
++
++#define CONFIG_SYS_HUSH_PARSER
++#define CONFIG_SYS_PROMPT_HUSH_PS2      "> "
++
++#define CONFIG_SYS_ARM_CACHE_WRITETHROUGH
++
++/* Serial */
++#define CONFIG_SCIF_CONSOLE
++#define CONFIG_CONS_SCIF3
++#define SCIF3_BASE			0xE8008800
++
++/* Memory */
++/* u-boot relocated to top 256KB of ram */
++#define CONFIG_NR_DRAM_BANKS		1
++#define CONFIG_SYS_TEXT_BASE		0x18000000
++
++#if !defined(CONFIG_RAM_64M)
++#define CONFIG_SYS_SDRAM_BASE		0x20000000
++#define CONFIG_SYS_SDRAM_SIZE		(10 * 1024 * 1024)
++#else
++#define CONFIG_SYS_SDRAM_BASE		0x0c000000
++#define CONFIG_SYS_SDRAM_SIZE		(64 * 1024 * 1024)
++#endif
++
++#define CONFIG_SYS_MEMTEST_START	CONFIG_SYS_SDRAM_BASE
++#define CONFIG_SYS_MEMTEST_END		(CONFIG_SYS_SDRAM_BASE + 0x4000000)
++#define CONFIG_SYS_MALLOC_LEN		(256 * 1024)
++#define CONFIG_SYS_MONITOR_LEN		(128 * 1024)
++#define CONFIG_SYS_LOAD_ADDR		(CONFIG_SYS_SDRAM_BASE + 4*1024*1024)
++#define	CONFIG_LOADADDR			CONFIG_SYS_SDRAM_BASE
++
++#if !defined(CONFIG_RAM_64M)
++#define CONFIG_SYS_INIT_SP_ADDR         (0x20500000)
++#else
++#define CONFIG_SYS_INIT_SP_ADDR		(0x0e000000)
++#endif
++
++#define CONFIG_SYS_NO_FLASH
++#undef CONFIG_CMD_IMLS
++
++#if !defined(CONFIG_BOOT_MODE0)
++#define CONFIG_ENV_IS_IN_SPI_FLASH
++#define CONFIG_ENV_OFFSET	0x80000
++#define CONFIG_ENV_SECT_SIZE	0x40000
++#else
++#define CONFIG_ENV_IS_IN_FLASH
++#define CONFIG_ENV_OFFSET	(512 * 1024)
++#define CONFIG_ENV_SECT_SIZE	(256 * 1024)
++#endif
++
++#define CONFIG_ENV_SIZE		CONFIG_ENV_SECT_SIZE
++#define CONFIG_ENV_ADDR		(CONFIG_SYS_FLASH_BASE + CONFIG_ENV_OFFSET)
++#define CONFIG_ENV_OVERWRITE	1
++
++#define __io
++
++/* Spi-Flash configuration */
++#define CONFIG_RZ_SPI
++#define CONFIG_SPI_FLASH
++#define CONFIG_SPI_FLASH_SPANSION
++#define CONFIG_RZA1_BASE_QSPI0		0x3FEFA000
++
++/* I2C configuration */
++#define CONFIG_SH_RIIC
++#define CONFIG_HARD_I2C
++#define CONFIG_I2C_MULTI_BUS
++#define CONFIG_SYS_MAX_I2C_BUS		4
++#define CONFIG_SYS_I2C_SPEED		100000 /* 100 kHz */
++#define CONFIG_SYS_I2C_EEPROM_ADDR	0x50
++#define CONFIG_SYS_I2C_EEPROM_ADDR_LEN	2
++#define CONFIG_SYS_I2C_MODULE		2
++#define CONFIG_SH_I2C_BASE0		0xFCFEE000
++#define CONFIG_SH_I2C_BASE1		0xFCFEE400
++#define CONFIG_SH_I2C_BASE2		0xFCFEE800
++#define CONFIG_SH_I2C_BASE3		0xFCFEEc00
++
++/* RTC configuration */
++#define CONFIG_RTC_RZA1
++#define CONFIG_RTC_RZA1_BASE_ADDR	0xFCFF1000
++
++/* Board Clock */
++#define CONFIG_SYS_CLK_FREQ	66666666 /* P1 clock. */
++#define CONFIG_SYS_HZ		1000
++
++/* Network interface */
++#define CONFIG_SH_ETHER
++#define CONFIG_SH_ETHER_USE_PORT	0
++#define CONFIG_SH_ETHER_PHY_ADDR	0
++#define CONFIG_SH_ETHER_PHY_MODE PHY_INTERFACE_MODE_MII
++#define CONFIG_SH_ETHER_EEPROM_ADDR	2 /* MAC address offset in EEPROM */
++#define CONFIG_PHYLIB
++#define CONFIG_BITBANGMII
++#define CONFIG_BITBANGMII_MULTI
++
++/* USB host controller */
++#define CONFIG_USB_R8A66597_HCD
++#define CONFIG_R8A66597_BASE_ADDR	0xE8010000
++#define CONFIG_R8A66597_XTAL		0x0000	/* 48MHz */
++#define CONFIG_R8A66597_ENDIAN		0x0000	/* little */
++
++/*
++ * Lowlevel configuration
++ */
++/* Disable WDT */
++#define WTCSR_D		0xA518
++#define WTCNT_D		0x5A00
++
++/* Set clocks based on 13.3333MHz xtal */
++#define FRQCR_D		0x1035	/* CPU= 300-400 MHz */
++
++/* Disable on-chip data-retention RAM */
++#define SYSCR3_D	0x0000000f
++
++/* Enable all peripherals */
++#define STBCR3_D	0x00000000
++#define STBCR4_D	0x00000000
++#define STBCR5_D	0x00000000
++#define STBCR6_D	0x00000000
++#define STBCR7_D	0x00000024
++#define STBCR8_D	0x00000005
++#define STBCR9_D	0x00000000
++#define STBCR10_D	0x00000000
++#define STBCR11_D	0x000000c0
++#define STBCR12_D	0x000000f0
++
++/* Port Control register */
++/* Port1 Control register Reset */
++#define PM1_D		0x40ff	/* SCL2, SDA2, ET_COL, P15 */
++#define PMC1_D		0x4000
++#define PFC1_D		0x4000
++#define PFCE1_D		0x4000
++#define PFCAE1_D	0x0000
++#define PIBC1_D		0x0000
++#define PBDC1_D		0x0000
++#define PIPC1_D		0x0000
++
++/* Port1 Control register Set */
++#define PMC1_S		0x40ff
++#define PBDC1_S		0x00ff
++#define PIPC1_S		0x00ff
++
++/* Port2 Control register Reset */
++#define PM2_D		0xff08	/* ET_xxx */
++#define PMC2_D		0x0fff	/* SPBIO01_0, SPBIO11_0, SPBIO21_0, SPBIO31_0 */
++#define PFC2_D		0xffff
++#define PFCE2_D		0xf000
++#define PFCAE2_D	0x0000
++#define PIBC2_D		0x0000
++#define PBDC2_D		0x0000
++#define PIPC2_D		0x0fff
++
++/* Port2 Control register Set */
++#define PMC2_S		0xffff
++#define PBDC2_S		0xf000
++#define PIPC2_S		0xffff
++
++/* Port3 Control register Reset */
++#define PM3_D		0x007c	/* CS1, TxD2, RxD2, ET_MDIO, ET_RXCCLK
++				   ET_RXER ET_RXDV */
++#define PMC3_D		0x00f5
++#define PFC3_D		0x007d
++#define PFCE3_D		0x0084
++#define PFCAE3_D	0x0081
++#define PIBC3_D		0x0000
++#define PBDC3_D		0x0000
++#define PIPC3_D		0x00f7
++
++/* Port3 Control register Set */
++#define PMC3_S		0x00fd
++#define PBDC3_S		0x0008
++#define PIPC3_S		0x00ff
++
++/* Port5 Control register Set */
++#define PM5_D		0x00ff	/* CS2, ET_MDC */
++#define PMC5_D		0x0300
++#define PFC5_D		0x0300
++#define PFCE5_D		0x0000
++#define PFCAE5_D	0x0100
++
++/* Port6 Control register Set */
++#define PMC6_D		0xffff	/* D1 - D15 */
++#define PIPC6_D		0xffff
++
++/* Port7 Control register Set */
++#define PM7_D		0x0000	/* WE0/DQMLL, RD/WR, RD, CS0 */
++#define PMC7_D		0xffff	/* CS3, CKE, CAS, RAS, WE1/DQMLL, A7-A1 */
++#define PFC7_D		0x0000
++#define PFCE7_D		0x0000
++#define PFCAE7_D	0x0000
++#define PIPC7_D		0xffff
++
++/* Port8 Control register Set */
++#define PM8_D		0x0000	/* A23-A8 */
++#define PMC8_D		0xffff
++#define PFC8_D		0x0000
++#define PFCE8_D		0x0300
++#define PFCAE8_D	0x0300
++#define PIPC8_D		0xffff  /* A23-A8 NOR, A15-A8 SDRAM */
++
++/* Port9 Control register Set */
++#define PM9_D		0xfffc	/* A25,A24 NOR, P9_2-P9_7(SPBxxx) SPI Flash */
++#define PMC9_D		0x00ff	/* SPBIO00_0, SPBIO10_0, SPBIO20_0, SPBIO20_0 */
++#define PFC9_D		0x00fc
++#define PFCE9_D		0x0000
++#define PFCAE9_D	0x0000
++#define PIPC9_D		0x00ff
++
++/* Configure NOR Flash (CS0, CS1) */
++#define CS0WCR_D	0x00000b40
++#define CS0BCR_D	0x10000C00
++#define CS1WCR_D	0x00000b40
++#define CS1BCR_D	0x10000C00
++
++/* Configure SDRAM (CS2, CS3) */
++#define CS2BCR_D	0x00004C00
++#define CS2WCR_D	0x00000080
++#define CS3BCR_D	0x00004C00
++#define CS3WCR_D	0x00002492
++#define SDCR_D		0x00120812
++#define RTCOR_D		0xA55A0020
++#define RTCSR_D		0xA55A0010
++
++#endif	/* __RSKRZA1_H */
+-- 
+1.8.4.1
+
