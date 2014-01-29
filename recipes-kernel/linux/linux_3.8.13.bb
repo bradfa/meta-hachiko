@@ -20,4 +20,4 @@ SRC_URI += "file://defconfig"
 SRC_URI[kernel.md5sum] = "db03acc21c41fc6bea8ddf7a77fc83aa"
 SRC_URI[kernel.sha256sum] = "7107a2ea655bde36bc470ac87707771801076e99919a6497f1eec494c70b0f99"
 
-COMPATIBLE_MACHINE_hachiko64 = "hachiko64"
+COMPATIBLE_MACHINE = "hachiko64|hachiko"
