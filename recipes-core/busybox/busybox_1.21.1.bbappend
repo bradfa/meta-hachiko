@@ -1,4 +1,4 @@
-FILESEXTRAPATHS_prepend := "${THISDIR}/${P}:"
+FILESEXTRAPATHS_prepend := "${THISDIR}/files:"
 
-SRC_URI_hachiko += "file://sid.cfg \
-		    file://cttyhack.cfg"
+SRC_URI += "file://sid.cfg \
+	    file://cttyhack.cfg"
