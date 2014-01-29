@@ -6,7 +6,7 @@ inherit kernel
 require recipes-kernel/linux/linux-dtb.inc
 
 LINUX_VERSION = "3.8.13"
-PR = "r1"
+PR = "r2"
 
 FILESEXTRAPATHS_prepend := "${THISDIR}/files:"
 
