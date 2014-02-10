@@ -1,4 +1,4 @@
-From 1a4e5e30e72f469eafc2fdd496fd41bcd8b93dfd Mon Sep 17 00:00:00 2001
+From 0b58c2896fcb6e82d25fcf998c70168820696328 Mon Sep 17 00:00:00 2001
 From: Carlo Caione <carlo.caione@gmail.com>
 Date: Fri, 24 Jan 2014 17:18:10 +0100
 Subject: [PATCH 2/2] Add hachiko support
@@ -6,12 +6,13 @@ Subject: [PATCH 2/2] Add hachiko support
 Signed-off-by: Carlo Caione <carlo.caione@gmail.com>
 ---
  arch/arm/include/asm/arch-rza1/rza1-regs.h |   6 +
+ arch/arm/include/asm/mach-types.h          |   1 +
  board/renesas/hachiko/Makefile             |  38 ++++
  board/renesas/hachiko/hachiko.c            |  80 ++++++++
  board/renesas/hachiko/lowlevel_init.S      | 176 +++++++++++++++++
  boards.cfg                                 |   2 +
  include/configs/hachiko.h                  | 304 +++++++++++++++++++++++++++++
- 6 files changed, 606 insertions(+)
+ 7 files changed, 607 insertions(+)
  create mode 100644 board/renesas/hachiko/Makefile
  create mode 100644 board/renesas/hachiko/hachiko.c
  create mode 100644 board/renesas/hachiko/lowlevel_init.S
@@ -38,6 +39,18 @@ index 5d736db..6d6d033 100644
  /* Clock Registers */
  #define FRQCR (RZA1_FRQCR_BASE + 0x00)
  #define FRQCR2 (RZA1_FRQCR_BASE + 0x04)
+diff --git a/arch/arm/include/asm/mach-types.h b/arch/arm/include/asm/mach-types.h
+index 25c182b..68fe09d 100644
+--- a/arch/arm/include/asm/mach-types.h
++++ b/arch/arm/include/asm/mach-types.h
+@@ -1107,6 +1107,7 @@ extern unsigned int __machine_arch_type;
+ #define MACH_TYPE_ARMADILLO_800EVA     3863
+ #define MACH_TYPE_KZM9G                4140
+ #define MACH_TYPE_RSKRZA1              4533
++#define MACH_TYPE_HACHIKO              4860
+ 
+ #ifdef CONFIG_ARCH_EBSA110
+ # ifdef machine_arch_type
 diff --git a/board/renesas/hachiko/Makefile b/board/renesas/hachiko/Makefile
 new file mode 100644
 index 0000000..d6ec5f7
@@ -365,12 +378,12 @@ index 19351cd..463fcd3 100644
  actux1_4_32                  arm         ixp         actux1              -              -           actux1:FLASH2X2,RAM_32MB
 diff --git a/include/configs/hachiko.h b/include/configs/hachiko.h
 new file mode 100644
-index 0000000..7bd8755
+index 0000000..2422339
 --- /dev/null
 +++ b/include/configs/hachiko.h
 @@ -0,0 +1,304 @@
 +/*
-+ * Configuation settings for the Renesas RSKRZA1 board
++ * Configuation settings for the Renesas HACHIKO board
 + *
 + * Copyright (C) 2014 Carlo Caione <carlo@caione.org>.
 + *
@@ -384,14 +397,14 @@ index 0000000..7bd8755
 + * See the file COPYING in the root directory of the source tree for details.
 + */
 +
-+#ifndef __RSKRZA1_H
-+#define __RSKRZA1_H
++#ifndef __HACHIKO_H
++#define __HACHIKO_H
 +
 +#undef DEBUG
 +#define CONFIG_ARMV7		1	/* This is an ARM V7 CPU core */
 +#define CONFIG_CPU_RZA1	1
 +#define CONFIG_BOARD_LATE_INIT	1
-+#define CONFIG_MACH_TYPE MACH_TYPE_RSKRZA1
++#define CONFIG_MACH_TYPE MACH_TYPE_HACHIKO
 +#define CONFIG_BOARD_EARLY_INIT_F
 +
 +#define CONFIG_CMD_NET
@@ -672,7 +685,7 @@ index 0000000..7bd8755
 +#define RTCOR_D		0xA55A0020
 +#define RTCSR_D		0xA55A0010
 +
-+#endif	/* __RSKRZA1_H */
++#endif	/* __HACHIKO_H */
 -- 
 1.8.4.1
 
