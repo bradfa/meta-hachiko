@@ -1,4 +1,4 @@
-From 0b58c2896fcb6e82d25fcf998c70168820696328 Mon Sep 17 00:00:00 2001
+From 52971ccd481197a318322f2db3cf580e377916bc Mon Sep 17 00:00:00 2001
 From: Carlo Caione <carlo.caione@gmail.com>
 Date: Fri, 24 Jan 2014 17:18:10 +0100
 Subject: [PATCH 2/2] Add hachiko support
@@ -378,7 +378,7 @@ index 19351cd..463fcd3 100644
  actux1_4_32                  arm         ixp         actux1              -              -           actux1:FLASH2X2,RAM_32MB
 diff --git a/include/configs/hachiko.h b/include/configs/hachiko.h
 new file mode 100644
-index 0000000..2422339
+index 0000000..c253026
 --- /dev/null
 +++ b/include/configs/hachiko.h
 @@ -0,0 +1,304 @@
@@ -590,7 +590,7 @@ index 0000000..2422339
 +
 +/* Port Control register */
 +/* Port1 Control register Reset */
-+#define PM1_D		0x40ff	/* SCL2, SDA2, ET_COL, P15 */
++#define PM1_D		0x40df	/* SCL2, SDA2, ET_COL, P15 */
 +#define PMC1_D		0x4000
 +#define PFC1_D		0x4000
 +#define PFCE1_D		0x4000
@@ -600,7 +600,7 @@ index 0000000..2422339
 +#define PIPC1_D		0x0000
 +
 +/* Port1 Control register Set */
-+#define PMC1_S		0x40ff
++#define PMC1_S		0x40df
 +#define PBDC1_S		0x00ff
 +#define PIPC1_S		0x00ff
 +
