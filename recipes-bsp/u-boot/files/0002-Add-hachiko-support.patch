@@ -1,4 +1,4 @@
-From 52971ccd481197a318322f2db3cf580e377916bc Mon Sep 17 00:00:00 2001
+From f7802c30960b6876061042936b3567fb2927222e Mon Sep 17 00:00:00 2001
 From: Carlo Caione <carlo.caione@gmail.com>
 Date: Fri, 24 Jan 2014 17:18:10 +0100
 Subject: [PATCH 2/2] Add hachiko support
@@ -9,10 +9,10 @@ Signed-off-by: Carlo Caione <carlo.caione@gmail.com>
  arch/arm/include/asm/mach-types.h          |   1 +
  board/renesas/hachiko/Makefile             |  38 ++++
  board/renesas/hachiko/hachiko.c            |  80 ++++++++
- board/renesas/hachiko/lowlevel_init.S      | 176 +++++++++++++++++
+ board/renesas/hachiko/lowlevel_init.S      | 176 ++++++++++++++++
  boards.cfg                                 |   2 +
- include/configs/hachiko.h                  | 304 +++++++++++++++++++++++++++++
- 7 files changed, 607 insertions(+)
+ include/configs/hachiko.h                  | 312 +++++++++++++++++++++++++++++
+ 7 files changed, 615 insertions(+)
  create mode 100644 board/renesas/hachiko/Makefile
  create mode 100644 board/renesas/hachiko/hachiko.c
  create mode 100644 board/renesas/hachiko/lowlevel_init.S
@@ -378,10 +378,10 @@ index 19351cd..463fcd3 100644
  actux1_4_32                  arm         ixp         actux1              -              -           actux1:FLASH2X2,RAM_32MB
 diff --git a/include/configs/hachiko.h b/include/configs/hachiko.h
 new file mode 100644
-index 0000000..c253026
+index 0000000..a5f5db3
 --- /dev/null
 +++ b/include/configs/hachiko.h
-@@ -0,0 +1,304 @@
+@@ -0,0 +1,312 @@
 +/*
 + * Configuation settings for the Renesas HACHIKO board
 + *
@@ -426,7 +426,6 @@ index 0000000..c253026
 +#define CONFIG_BOOTP_NTPSERVER
 +#define CONFIG_BOOTP_TIMEOFFSET
 +
-+
 +#define CONFIG_OF_LIBFDT
 +#define CONFIG_CMDLINE_EDITING
 +#define CONFIG_CMDLINE_TAG
@@ -438,22 +437,31 @@ index 0000000..c253026
 +#endif
 +
 +#if !defined(CONFIG_RAM_64MB)
-+#define CONFIG_EXTRA_ENV_SETTINGS \
-+	"bootcmd=usb start ; run usbload ; bootm 20007fc0 - 20500000\0" \
-+	"usbload=ext2load usb 0 20007fc0 /boot/uImage ; ext2load usb 0 20500000 /boot/rza1-hachiko.dtb\0"
++#define ENV_PARAMS 			\
++	"kernel_addr=0x20007fc0\0" 	\
++	"fdt_addr=0x20500000\0"		\
++	"initpath=init=/init\0"		\
++	"fbparam=\0"
 +#else
-+#define CONFIG_EXTRA_ENV_SETTINGS \
-+	"bootcmd=usb start ; run usbload ; bootm 0f000000 - 0e500000\0" \
-+	"usbload=ext2load usb 0 0f000000 /boot/uImage ; ext2load usb 0 0e500000 /boot/rza1-hachiko.dtb\0"
++#define ENV_PARAMS 			\
++	"kernel_addr=0x0f000000\0" 	\
++	"fdt_addr=0x0e500000\0"		\
++	"initpath=\0"			\
++	"fbparam=vdc5fb0=3 vdc5fb1=4\0"
 +#endif
++
++#define CONFIG_BOOTCOMMAND \
++	"if run usbload; then run boot_usb; else run boot_nor; fi"
++
++#define CONFIG_EXTRA_ENV_SETTINGS 																	\
++	ENV_PARAMS 																			\
++	"usbload=usb start && ext2load usb 0 ${kernel_addr} /boot/uImage ; ext2load usb 0 ${fdt_addr} /boot/rza1-hachiko.dtb\0" 					\
++	"boot_usb=run setusbargs; bootm ${kernel_addr} - ${fdt_addr}\0" 												\
++	"boot_nor=run setnorargs; bootm 0x180c0000 - 0x184c0000\0" 													\
++	"setusbargs=setenv bootargs console=ttySC3,115200 root=/dev/sda1 rw rootdelay=3 ignore_loglevel earlyprintk=sh-sci.3,115200 ${initpath} ${fbparam}\0" 		\
++	"setnorargs=setenv bootargs console=ttySC3,115200 root=/dev/mtdblock4 rw rootfstype=jffs2 ignore_loglevel earlyprintk=sh-sci.3,115200 ${initpath} ${fbparam}\0"
 +
 +#define CONFIG_BAUDRATE		115200
-+
-+#if !defined(CONFIG_RAM_64MB)
-+#define CONFIG_BOOTARGS		"console=ttySC3,115200 root=/dev/sda1 init=/init rw rootdelay=3 ignore_loglevel earlyprintk=sh-sci.3,115200"
-+#else
-+#define CONFIG_BOOTARGS		"console=ttySC3,115200 root=/dev/sda1 rw rootdelay=3 ignore_loglevel earlyprintk=sh-sci.3,115200 vdc5fb0=3 vdc5fb1=4"
-+#endif
 +
 +#define CONFIG_BOOTDELAY	3
 +#define CONFIG_SYS_BAUDRATE_TABLE	{ CONFIG_BAUDRATE }
